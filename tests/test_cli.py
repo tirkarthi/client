@@ -298,7 +298,10 @@ def test_artifact_ls(runner, git_repo, mock_server):
 
 
 def test_docker_run_digest(runner, docker, monkeypatch):
-    result = runner.invoke(cli.docker_run, [DOCKER_SHA],)
+    result = runner.invoke(
+        cli.docker_run,
+        [DOCKER_SHA],
+    )
     assert result.exit_code == 0
     docker.assert_called_once_with(
         [
@@ -1007,3 +1010,18 @@ def test_launch_agent_base(
         result = runner.invoke(cli.launch_agent, "test_project")
         print(result.output)
     assert False
+
+
+def test_launch_no_docker_exec(
+    runner,
+    monkeypatch,
+    mocked_fetchable_git_repo,
+    test_settings,
+):
+    monkeypatch.setattr(wandb.sdk.launch.docker, "find_executable", lambda name: False)
+    result = runner.invoke(
+        cli.launch,
+        ["https://wandb.ai/mock_server_entity/test_project/runs/1"],
+    )
+    assert result.exit_code == 1
+    assert "Could not find Docker executable" in str(result.exception)
