@@ -298,10 +298,7 @@ def test_artifact_ls(runner, git_repo, mock_server):
 
 
 def test_docker_run_digest(runner, docker, monkeypatch):
-    result = runner.invoke(
-        cli.docker_run,
-        [DOCKER_SHA],
-    )
+    result = runner.invoke(cli.docker_run, [DOCKER_SHA],)
     assert result.exit_code == 0
     docker.assert_called_once_with(
         [
@@ -1002,9 +999,11 @@ def test_launch_add_default(runner, test_settings, live_mock_server):
     assert len(ctx["run_queues"]["1"]) == 1
 
 
+@pytest.mark.timeout(120)
 def test_launch_agent_base(
     runner, test_settings, live_mock_server, mocked_fetchable_git_repo
 ):
     with runner.isolated_filesystem():
         result = runner.invoke(cli.launch_agent, "test_project")
         print(result.output)
+    assert False
