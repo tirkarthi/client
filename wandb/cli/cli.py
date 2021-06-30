@@ -976,7 +976,7 @@ def launch(
     By default, Git projects run in a new working directory with the given parameters, while
     local projects run from the project's root directory.
     """
-    api = _get_cling_api()
+    api = _get_cling_api(reset=True)
     project, entity, _ = set_project_entity_defaults(uri, project, entity, api)
 
     param_dict = _user_args_to_dict(param_list)
@@ -1029,7 +1029,7 @@ def launch(
 @click.option("--queues", "-q", default="default", help="The queue names to poll")
 @display_error
 def launch_agent(ctx, project=None, entity=None, queues=None):
-    api = _get_cling_api()
+    api = _get_cling_api(reset=True)
     queues = queues.split(",")  # todo: check for none?
     if api.api_key is None:
         wandb.termlog("Login to W&B to use the launch agent feature")
@@ -1103,7 +1103,7 @@ def launch_add(
     version=None,
     param_list=None,
 ):
-    api = _get_cling_api()
+    api = _get_cling_api(reset=True)
     project, entity, run_id = set_project_entity_defaults(uri, project, entity, api)
 
     run_spec = {}
