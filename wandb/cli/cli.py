@@ -340,7 +340,9 @@ def init(ctx, project, entity, reset, mode):
         team_names = [e["node"]["name"] for e in viewer["teams"]["edges"]] + [
             "Manual entry"
         ]
-        wandb.termlog("Which team should we use?",)
+        wandb.termlog(
+            "Which team should we use?",
+        )
         result = util.prompt_choices(team_names)
         # result can be empty on click
         if result:
@@ -1035,7 +1037,12 @@ def launch_agent(ctx, project=None, entity=None, queues=None):
 
 
 @cli.command(help="Add a job onto the run queue for a specified resource")
-@click.argument("uri")
+@click.option(
+    "--uri",
+    "-u",
+    default=None,
+    help="A wandb url pointing to a run eg. https://wandb.ai/enitity/project/runs/run_id",
+)
 @click.option("--config", "-c", default=None, help="Path to a user config")
 @click.option("--project", "-p", default=None, help="The project to use.")
 @click.option("--entity", "-e", default=None, help="The entity to use.")
@@ -1083,7 +1090,7 @@ def launch_agent(ctx, project=None, entity=None, queues=None):
     "corresponding entry point as command-line arguments in the form `--name value`",
 )
 def launch_add(
-    uri,
+    uri=None,
     config=None,
     project=None,
     entity=None,
@@ -1095,24 +1102,54 @@ def launch_add(
     param_list=None,
 ):
     api = _get_cling_api(reset=True)
-    project, entity, run_id = set_project_entity_defaults(uri, project, entity, api)
+    src_project, src_entity, run_id = set_project_entity_defaults(
+        uri, project, entity, api
+    )
+    viewer = api.viewer()
+    viewer_access_to_src = True
+    if viewer["entity"] != src_entity and src_entity not in [
+        e["node"]["name"] for e in viewer["teams"]["edges"]
+    ]:
+        viewer_access_to_src = False
 
     run_spec = {}
     if config is not None:
         with open(config, "r") as f:
             run_spec = json.load(f)
-    # current behavior we override anything in supplied config with cli args if passed
-    run_spec["run_id"] = run_id
-    run_spec["entry_point"] = entry_point
-    run_spec["project"] = project
-    run_spec["entity"] = entity
-    run_spec["overrides"] = {}
-    if resource is not None:
-        run_spec["resource"] = resource
-    if version is not None:
-        run_spec["version"] = version
+
+    if viewer_access_to_src:
+        if project:
+            run_spec["project"] = project
+        elif run_spec.get("project") is None:
+            run_spec["project"] = src_project
+        if entity:
+            run_spec["entity"] = entity
+        elif run_spec.get("entity") is None:
+            run_spec["entity"] = src_entity
+    else:
+        if project:
+            run_spec["project"] = project
+        elif run_spec.get("project") is None:
+            run_spec["project"] = api.default_project or src_project
+        if entity:
+            run_spec["entity"] = entity
+        elif run_spec.get("entity") is None:
+            run_spec["entity"] = api.default_entity
+
+    if run_spec.get("overrides") is None:
+        run_spec["overrides"] = {}
+
+    if entry_point:
+        run_spec["overrides"]["entry_point"] = entry_point
     if param_list is not None:
         run_spec["overrides"]["args"] = _user_args_to_dict(param_list)
+
+    if resource:
+        run_spec["resource"] = resource
+    elif run_spec.get("resource") is None:
+        run_spec["resource"] = "local"
+    if version is not None:
+        run_spec["version"] = version
 
     if experiment_name is not None:
         run_spec["name"] = experiment_name
@@ -1518,7 +1555,9 @@ def put(path, name, description, type, alias):
     )
 
     wandb.termlog(
-        '    artifact = run.use_artifact("{path}")\n'.format(path=artifact_path,),
+        '    artifact = run.use_artifact("{path}")\n'.format(
+            path=artifact_path,
+        ),
         prefix=False,
     )
 
