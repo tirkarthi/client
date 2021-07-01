@@ -221,3 +221,19 @@ def test_push_to_runqueue(live_mock_server, test_settings):
     api.push_to_run_queue("default", run_spec)
     ctx = live_mock_server.get_ctx()
     assert len(ctx["run_queues"]["1"]) == 1
+
+
+# def test_launch_no_docker_executable(test_settings, monkeypatch):
+#     monkeypatch.setattr(wandb.sdk.launch.docker, "find_executable", lambda name: False)
+#     api = wandb.sdk.internal.internal_api.Api(
+#         default_settings=test_settings, load_settings=False
+#     )
+#     expected_config = {}
+#     uri = "https://wandb.ai/mock_server_entity/test/runs/1"
+#     kwargs = {
+#         "uri": uri,
+#         "api": api,
+#         "wandb_entity": "mock_server_entity",
+#         "wandb_project": "test",
+#     }
+#     mock_with_run_info = launch.run(**kwargs)

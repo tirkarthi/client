@@ -1,7 +1,5 @@
 import logging
 import os
-import platform
-import posixpath
 import signal
 import subprocess
 import sys
@@ -18,9 +16,7 @@ from ..docker import (
 from ..utils import (
     get_entry_point_command,
     PROJECT_DOCKER_ARGS,
-    PROJECT_STORAGE_DIR,
     PROJECT_SYNCHRONOUS,
-    WANDB_DOCKER_WORKDIR_PATH,
 )
 
 
@@ -76,7 +72,6 @@ class LocalRunner(AbstractRunner):
     def run(self, project, backend_config):
         synchronous = backend_config[PROJECT_SYNCHRONOUS]
         docker_args = backend_config[PROJECT_DOCKER_ARGS]
-        storage_dir = backend_config[PROJECT_STORAGE_DIR]
 
         entry_point = project.get_single_entry_point()
 
@@ -85,7 +80,6 @@ class LocalRunner(AbstractRunner):
 
         command_args = []
         command_separator = " "
-
         validate_docker_env(project)
         validate_docker_installation()
         image = build_docker_image(
@@ -109,7 +103,9 @@ class LocalRunner(AbstractRunner):
         # persisted to the tracking server if interrupted
         if synchronous:
             command_args += get_entry_point_command(
-                project, entry_point, project.parameters, storage_dir
+                project,
+                entry_point,
+                project.parameters,
             )
             command_str = command_separator.join(command_args)
 
@@ -123,7 +119,6 @@ class LocalRunner(AbstractRunner):
             entry_point=entry_point,
             parameters=project.parameters,
             docker_args=docker_args,
-            storage_dir=storage_dir,
         )
 
 
@@ -170,7 +165,10 @@ def _run_entry_point(command, work_dir):
 
 
 def _invoke_wandb_run_subprocess(
-    work_dir, entry_point, parameters, docker_args, storage_dir,
+    work_dir,
+    entry_point,
+    parameters,
+    docker_args,
 ):
     """
     Run an W&B project asynchronously by invoking ``wandb launch`` in a subprocess, returning
@@ -182,14 +180,13 @@ def _invoke_wandb_run_subprocess(
         uri=work_dir,
         entry_point=entry_point,
         docker_args=docker_args,
-        storage_dir=storage_dir,
         parameters=parameters,
     )
     wandb_run_subprocess = _run_launch_cmd(wandb_run_arr)
     return LocalSubmittedRun(wandb_run_subprocess)
 
 
-def _build_wandb_run_cmd(uri, entry_point, docker_args, storage_dir, parameters):
+def _build_wandb_run_cmd(uri, entry_point, docker_args, parameters):
     """
     Build and return an array containing an ``wandb launch`` command that can be invoked to locally
     run the project at the specified URI.
@@ -200,8 +197,6 @@ def _build_wandb_run_cmd(uri, entry_point, docker_args, storage_dir, parameters)
         for key, value in docker_args.items():
             args = key if isinstance(value, bool) else "%s=%s" % (key, value)
             wandb_run_arr.extend(["--docker-args", args])
-    if storage_dir is not None:
-        wandb_run_arr.extend(["--storage-dir", storage_dir])
     for key, value in parameters.items():
         wandb_run_arr.extend(["-P", "%s=%s" % (key, value)])
     return wandb_run_arr
@@ -252,69 +247,3 @@ def _get_docker_command(image, docker_args=None, volumes=None, user_env_vars=Non
         cmd += ["-e", "{key}={value}".format(key=key, value=value)]
     cmd += [image.tags[0]]
     return cmd
-
-
-def _get_local_artifact_cmd_and_envs(uri):
-    artifact_dir = os.path.dirname(uri)
-    container_path = artifact_dir
-    if not os.path.isabs(container_path):
-        container_path = os.path.join(WANDB_DOCKER_WORKDIR_PATH, container_path)
-        container_path = os.path.normpath(container_path)
-    abs_artifact_dir = os.path.abspath(artifact_dir)
-    return ["-v", "%s:%s" % (abs_artifact_dir, container_path)], {}
-
-
-def _get_s3_artifact_cmd_and_envs():
-    # pylint: disable=unused-argument
-    if platform.system() == "Windows":
-        win_user_dir = os.environ["USERPROFILE"]
-        aws_path = os.path.join(win_user_dir, ".aws")
-    else:
-        aws_path = posixpath.expanduser("~/.aws")
-
-    volumes = []
-    if posixpath.exists(aws_path):
-        volumes = ["-v", "%s:%s" % (str(aws_path), "/.aws")]
-    envs = {
-        "AWS_SECRET_ACCESS_KEY": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-        "AWS_ACCESS_KEY_ID": os.environ.get("AWS_ACCESS_KEY_ID"),
-        "AWS_S3_ENDPOINT_URL": os.environ.get("AWS_S3_ENDPOINT_URL"),
-        "AWS_S3_IGNORE_TLS": os.environ.get("AWS_S3_IGNORE_TLS"),
-    }
-    envs = dict((k, v) for k, v in envs.items() if v is not None)
-    return volumes, envs
-
-
-def _get_azure_blob_artifact_cmd_and_envs():
-    # pylint: disable=unused-argument
-    envs = {
-        "AZURE_STORAGE_CONNECTION_STRING": os.environ.get(
-            "AZURE_STORAGE_CONNECTION_STRING"
-        ),
-        "AZURE_STORAGE_ACCESS_KEY": os.environ.get("AZURE_STORAGE_ACCESS_KEY"),
-    }
-    envs = dict((k, v) for k, v in envs.items() if v is not None)
-    return [], envs
-
-
-def _get_gcs_artifact_cmd_and_envs():
-    # pylint: disable=unused-argument
-    cmds = []
-    envs = {}
-
-    if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
-        credentials_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-        cmds = ["-v", "{}:/.gcs".format(credentials_path)]
-        envs["GOOGLE_APPLICATION_CREDENTIALS"] = "/.gcs"
-    return cmds, envs
-
-
-def _get_docker_artifact_storage_cmd_and_envs(artifact_uri):
-    if artifact_uri.startswith("gs:"):
-        return _get_gcs_artifact_cmd_and_envs()
-    elif artifact_uri.startswith("s3:"):
-        return _get_s3_artifact_cmd_and_envs()
-    elif artifact_uri.startswith("az:"):
-        return _get_azure_blob_artifact_cmd_and_envs()
-    else:
-        return _get_local_artifact_cmd_and_envs()

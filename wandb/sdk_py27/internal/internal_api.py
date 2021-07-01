@@ -790,7 +790,6 @@ class Api(object):
             "projectName": project,
             "entity": entity,
         }
-
         res = self.gql(query, variable_values)
         if res.get("project") is None:
             raise Exception(

@@ -43,7 +43,7 @@ class LaunchAgent(object):
         )
         self.setup_run_queues(queues)
 
-    def setup_run_queues(self, queues):
+    def setup_run_queues(self, queues: Iterable[str]):
         project_run_queues = self._api.get_project_run_queues(
             self._entity, self._project
         )

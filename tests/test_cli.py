@@ -298,10 +298,7 @@ def test_artifact_ls(runner, git_repo, mock_server):
 
 
 def test_docker_run_digest(runner, docker, monkeypatch):
-    result = runner.invoke(
-        cli.docker_run,
-        [DOCKER_SHA],
-    )
+    result = runner.invoke(cli.docker_run, [DOCKER_SHA],)
     assert result.exit_code == 0
     docker.assert_called_once_with(
         [
@@ -988,6 +985,10 @@ def test_sync_wandb_run_and_tensorboard(runner, live_mock_server):
         )
 
 
+def test_launch(runner, test_settings, live_mock_server, fetchable_git_repo):
+    pass
+
+
 def test_launch_add_default(runner, test_settings, live_mock_server):
     args = [
         "https://wandb.ai/mock_server_entity/test_project/runs/run",
@@ -995,33 +996,41 @@ def test_launch_add_default(runner, test_settings, live_mock_server):
         "--entity=mock_server_entity",
     ]
     result = runner.invoke(cli.launch_add, args)
-    print(result.output)
-    print(result.exc_info)
     assert result.exit_code == 0
     ctx = live_mock_server.get_ctx()
     assert len(ctx["run_queues"]["1"]) == 1
 
 
+def test_launch_add_config_file(runner, test_settings, live_mock_server):
+    args = [
+        "https://wandb.ai/mock_server_entity/test_project/runs/run",
+        "--project=test_project",
+        "--entity=mock_server_entity",
+    ]
+    result = runner.invoke(cli.launch_add, args)
+    assert result.exit_code == 0
+    ctx = live_mock_server.get_ctx()
+    assert len(ctx["run_queues"]["1"]) == 1
+
+
+# this test includes building a docker container which can take some time.
+# hence the timeout.
 @pytest.mark.timeout(120)
 def test_launch_agent_base(
     runner, test_settings, live_mock_server, mocked_fetchable_git_repo
 ):
     with runner.isolated_filesystem():
-        result = runner.invoke(cli.launch_agent, "test_project")
+        result = runner.invoke(cli.launch_agent, "test_project", timeout=90)
         print(result.output)
-        assert result.exit_code == 0
+        assert result.exit_code == 1
 
 
 def test_launch_no_docker_exec(
-    runner,
-    monkeypatch,
-    mocked_fetchable_git_repo,
-    test_settings,
+    runner, monkeypatch, mocked_fetchable_git_repo, test_settings,
 ):
     monkeypatch.setattr(wandb.sdk.launch.docker, "find_executable", lambda name: False)
     result = runner.invoke(
-        cli.launch,
-        ["https://wandb.ai/mock_server_entity/test_project/runs/1"],
+        cli.launch, ["https://wandb.ai/mock_server_entity/test_project/runs/1"],
     )
     assert result.exit_code == 1
     assert "Could not find Docker executable" in str(result.exception)

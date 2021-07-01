@@ -82,7 +82,6 @@ def build_docker_image(project: _project_spec.Project, name, base_image, api):
     """
     import docker  # type: ignore
 
-    image_uri = _get_docker_image_uri(repository_uri=name, work_dir=project.dir)
     if _is_wandb_local_uri(api.settings("base_url")):
         _, _, port = _, _, port = api.settings("base_url").split(":")
         base_url = "http://host.docker.internal:{}".format(port)
@@ -91,7 +90,6 @@ def build_docker_image(project: _project_spec.Project, name, base_image, api):
     else:
         base_url = api.settings("base_url")
     image_uri = _get_docker_image_uri(repository_uri=name, work_dir=project.dir)
-
     wandb_project = project.target_project
     wandb_entity = project.target_entity
 
