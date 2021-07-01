@@ -1009,7 +1009,7 @@ def test_launch_agent_base(
     with runner.isolated_filesystem():
         result = runner.invoke(cli.launch_agent, "test_project")
         print(result.output)
-    assert False
+        assert result.exit_code == 0
 
 
 def test_launch_no_docker_exec(
