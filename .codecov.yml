@@ -19,6 +19,10 @@ coverage:
       sdk-internal:
         paths:
           - wandb/sdk/internal/
+      sdk-launch:
+        target: 80%
+        paths:
+          - wandb/sdk/launch
       sdk-other:
         paths:
           - "!wandb/sdk/*.py"
